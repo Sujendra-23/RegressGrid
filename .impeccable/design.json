@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T05:05:15.692325+00:00",
+  "title": "Design System: RegressGrid",
+  "extensions": {
+    "shadows": [],
+    "motion": [
+      {
+        "name": "loading-spinner",
+        "value": "spin 1s linear infinite",
+        "purpose": "Loading controls; disabled for reduced motion"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "760px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1100px"
+      },
+      {
+        "name": "wide",
+        "value": "1450px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Submit and publish actions",
+      "html": "<button class=\"ds-primary\">Submit build</button>",
+      "css": ".ds-primary{font:500 14px \"IBM Plex Sans\",sans-serif;border:0;border-radius:5px;padding:10px 15px;background:var(--green,#18765d);color:white;cursor:pointer}.ds-primary:hover{background:#11573f}.ds-primary:focus-visible{outline:2px solid #17745c;outline-offset:3px}.ds-primary:disabled{opacity:.45;cursor:not-allowed}"
+    },
+    {
+      "name": "Status badge",
+      "kind": "chip",
+      "description": "Explicit status with color support",
+      "html": "<span class=\"ds-badge\">Passed</span>",
+      "css": ".ds-badge{font:500 10px \"IBM Plex Sans\",sans-serif;background:#e8f3e9;color:#226943;border-radius:4px;padding:4px 7px}"
+    },
+    {
+      "name": "Text input",
+      "kind": "input",
+      "description": "Repository and commit entry",
+      "html": "<input class=\"ds-input\" aria-label=\"Repository\" placeholder=\"Repository URL\"/>",
+      "css": ".ds-input{font:14px \"IBM Plex Sans\",sans-serif;border:1px solid #bccac2;border-radius:5px;padding:9px 10px;background:#fff;color:#253c35}.ds-input:focus-visible{outline:2px solid #17745c;outline-offset:3px}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Bordered evidence surface",
+      "html": "<section class=\"ds-panel\">Configuration matrix</section>",
+      "css": ".ds-panel{font:14px \"IBM Plex Sans\",sans-serif;border:1px solid #dce4dd;border-radius:8px;background:#fff;color:#253c35;padding:20px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Operational workbench",
+    "overview": "Compact evidence surfaces with explicit configuration context and real measurements.",
+    "keyCharacteristics": [
+      "Compact",
+      "Evidence-led",
+      "Explicit status"
+    ],
+    "rules": [],
+    "dos": [
+      "Do display actual state and measured values.",
+      "Do retain explicit labels alongside status color."
+    ],
+    "donts": [
+      "Don't invent counts, benchmark values, or production claims."
+    ]
+  }
+}

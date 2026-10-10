@@ -1,0 +1,9 @@
+.env
+.git
+.rocketride
+.claude
+.local
+build
+web/node_modules
+web/dist
+.impeccable

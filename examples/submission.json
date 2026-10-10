@@ -1,0 +1,12 @@
+{
+ "repository":"file:///demo/cpp",
+ "commit":"baseline",
+ "configurations":[
+  {"compiler":"gcc","build_type":"Debug"},
+  {"compiler":"gcc","build_type":"Release"},
+  {"compiler":"clang","build_type":"Debug"},
+  {"compiler":"clang","build_type":"Release"}
+ ],
+ "timeout_seconds":600,
+ "plugin":"cmake"
+}

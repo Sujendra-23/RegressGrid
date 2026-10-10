@@ -1,0 +1,24 @@
+FROM node:22-bookworm-slim AS web
+WORKDIR /src/web
+COPY web/package*.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+FROM golang:1.24-bookworm AS go
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY gen ./gen
+COPY internal ./internal
+COPY cmd ./cmd
+RUN CGO_ENABLED=0 go build -trimpath -o /out/regressgrid ./cmd/server && CGO_ENABLED=0 go build -trimpath -o /out/rg ./cmd/rg
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/* && useradd -u 10001 -m grid && mkdir -p /data && chown grid:grid /data
+COPY --from=go /out/ /usr/local/bin/
+COPY --from=web /src/web/dist /opt/regressgrid/web
+USER grid
+ENV HTTP_ADDR=0.0.0.0:8080 GRPC_ADDR=0.0.0.0:9090 DATA_DIR=/data WEB_DIR=/opt/regressgrid/web
+EXPOSE 8080 9090
+ENTRYPOINT ["regressgrid"]

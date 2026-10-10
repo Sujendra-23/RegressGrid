@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+node_modules/
+web/dist/
+build/
+.local/
+.DS_Store
+*.prof
+.impeccable/mocks/
+
+__pycache__/
+*.tsbuildinfo
+coverage.out
+.rocketride/
+.claude/
+.github/copilot-instructions.md

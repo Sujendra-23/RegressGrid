@@ -1,0 +1,14 @@
+FROM ubuntu:24.04 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential clang cmake ninja-build libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev libssl-dev libgtest-dev nlohmann-json3-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY proto ./proto
+COPY worker ./worker
+RUN cmake -S worker -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2 && ctest --test-dir build --output-on-failure
+
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential clang cmake ninja-build git ca-certificates libgrpc++1.51t64 libprotobuf32t64 libssl3t64 verilator && rm -rf /var/lib/apt/lists/* && useradd -u 10001 -m grid && mkdir -p /work /demo && chown grid:grid /work /demo
+COPY --from=build /src/build/regressgrid-worker /usr/local/bin/
+USER grid
+ENV WORK_DIR=/work WORKER_SLOTS=2 BUILD_PARALLELISM=2
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["regressgrid-worker"]

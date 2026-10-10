@@ -1,0 +1,3 @@
+Checks: '-*,bugprone-*,performance-*,modernize-use-nullptr,modernize-use-override,clang-analyzer-*'
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'worker/(src|include)/.*'

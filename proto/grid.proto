@@ -1,0 +1,63 @@
+syntax = "proto3";
+package regressgrid.v1;
+option go_package = "regressgrid/gen/gridv1";
+
+service Coordinator {
+  rpc Work(stream WorkerEvent) returns (stream CoordinatorEvent);
+}
+message Hello {
+  string id = 1;
+  repeated string compilers = 2;
+  uint32 slots = 3;
+  string platform = 4;
+  bool verilator = 5;
+}
+message Metrics {
+  double build_seconds = 1;
+  double test_seconds = 2;
+  uint64 peak_memory_bytes = 3;
+  double cpu_seconds = 4;
+  uint32 warnings = 5;
+  uint32 tests_passed = 6;
+  uint32 tests_failed = 7;
+  uint64 binary_bytes = 8;
+  double latency_ms = 9;
+  double throughput = 10;
+  bool cache_hit = 11;
+}
+message Result {
+  string status = 1;
+  string error = 2;
+  Metrics metrics = 3;
+  bool infrastructure_error = 4;
+}
+message ArtifactChunk {
+  string name = 1;
+  bytes data = 2;
+  bool complete = 3;
+  string sha256 = 4;
+}
+message WorkerEvent {
+  Hello hello = 1;
+  bool heartbeat = 2;
+  string job_id = 3;
+  string lease = 4;
+  string log = 5;
+  Result result = 6;
+  ArtifactChunk artifact = 7;
+}
+message Assignment {
+  string job_id = 1;
+  string lease = 2;
+  string repository = 3;
+  string commit = 4;
+  string compiler = 5;
+  string build_type = 6;
+  uint32 timeout_seconds = 7;
+  string plugin = 8;
+}
+message CoordinatorEvent {
+  Assignment assignment = 1;
+  string cancel_job_id = 2;
+  string cancel_lease = 3;
+}
