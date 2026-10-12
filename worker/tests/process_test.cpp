@@ -2,6 +2,7 @@
 #include "regressgrid/process.hpp"
 #include "regressgrid/thread_pool.hpp"
 #include <atomic>
+#include <cstdlib>
 #include <fstream>
 #include <future>
 #include <gtest/gtest.h>
@@ -78,6 +79,12 @@ TEST(Process, LargeOutputDoesNotDeadlock) {
   EXPECT_LE(r.tail.size(), 262144u);
 }
 TEST(Process, MissingCommandThrows) {
+  // posix_spawnp reports a missing executable through the vfork-style child
+  // sharing memory with the parent. Under user-mode emulation (qemu-user, and
+  // Docker Desktop's amd64 emulation on Arm Macs) that handshake does not work
+  // and posix_spawnp returns 0, so the cross-build test stage sets this variable.
+  if (std::getenv("RG_EMULATED_SPAWN"))
+    GTEST_SKIP() << "posix_spawnp cannot report ENOENT under user-mode emulation";
   EXPECT_THROW(rg::run_process({"regressgrid-command-does-not-exist"}, "/tmp",
                                1s, {}, [](auto, auto) {}),
                std::runtime_error);

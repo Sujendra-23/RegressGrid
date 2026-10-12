@@ -1,5 +1,5 @@
 FROM ubuntu:24.04 AS build
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential clang cmake ninja-build libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev libssl-dev libgtest-dev nlohmann-json3-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential clang cmake ninja-build libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev libssl-dev libgtest-dev nlohmann-json3-dev ca-certificates git && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY proto ./proto
 COPY worker ./worker

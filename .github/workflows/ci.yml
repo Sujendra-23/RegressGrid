@@ -31,15 +31,18 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        mode: [normal, sanitizers, tidy]
+        mode: [normal, sanitizers, tidy, tsan]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev libssl-dev libgtest-dev nlohmann-json3-dev clang-tidy verilator valgrind
+      - if: matrix.mode == 'tsan'
+        # Recent kernels' high ASLR entropy breaks ThreadSanitizer's shadow memory mapping.
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: Configure
-        run: cmake -S worker -B build/worker -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRG_SANITIZERS=${{ matrix.mode == 'sanitizers' && 'ON' || 'OFF' }} -DRG_TIDY=${{ matrix.mode == 'tidy' && 'ON' || 'OFF' }}
+        run: cmake -S worker -B build/worker -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRG_SANITIZERS=${{ matrix.mode == 'sanitizers' && 'ON' || 'OFF' }} -DRG_TIDY=${{ matrix.mode == 'tidy' && 'ON' || 'OFF' }} -DRG_TSAN=${{ matrix.mode == 'tsan' && 'ON' || 'OFF' }}
       - run: cmake --build build/worker --parallel 2
       - run: ctest --test-dir build/worker --output-on-failure
         env:
@@ -49,6 +52,12 @@ jobs:
         run: valgrind --error-exitcode=1 --leak-check=full ./build/worker/worker-tests --gtest_filter=Checksum.*:ThreadPool.*
       - if: matrix.mode == 'normal'
         run: python3 scripts/e2e.py --hardware --load 4
+  worker-aarch64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile for aarch64 and run GoogleTest under qemu-aarch64
+        run: docker build --platform linux/amd64 -f Dockerfile.worker-aarch64 --target test .
   compose:
     runs-on: ubuntu-24.04
     steps:
