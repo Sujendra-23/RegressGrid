@@ -1,4 +1,4 @@
-.PHONY: build test dev proto e2e up down
+.PHONY: build test dev proto e2e up down worker-tsan worker-aarch64 worker-aarch64-binaries bench-spsc
 build:
 	go build -o build/regressgrid ./cmd/server
 	go build -o build/rg ./cmd/rg
@@ -21,3 +21,16 @@ proto:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 	PATH="$(shell go env GOPATH)/bin:$$PATH" protoc --go_out=. --go_opt=module=regressgrid --go-grpc_out=. --go-grpc_opt=module=regressgrid proto/grid.proto
+worker-tsan:
+	cmake -S worker -B build/tsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRG_TSAN=ON
+	cmake --build build/tsan --parallel 2
+	ctest --test-dir build/tsan --output-on-failure
+# Cross-compile the worker for aarch64 and run its GoogleTest suite under qemu-user.
+worker-aarch64:
+	docker build --platform linux/amd64 -f Dockerfile.worker-aarch64 --target test .
+worker-aarch64-binaries:
+	docker build --platform linux/amd64 -f Dockerfile.worker-aarch64 --target binaries -o build/aarch64 .
+bench-spsc:
+	cmake -S worker -B build/bench -G Ninja -DCMAKE_BUILD_TYPE=Release
+	cmake --build build/bench --target spsc-bench
+	./build/bench/spsc-bench

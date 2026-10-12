@@ -1,4 +1,5 @@
 #include "regressgrid/executor.hpp"
+#include "regressgrid/log_pipe.hpp"
 #include "regressgrid/process.hpp"
 #include <algorithm>
 #include <array>
@@ -94,6 +95,16 @@ void execute(const pb::Assignment &job, const fs::path &root,
   pb::Result final;
   final.set_status("failed");
   auto *metrics = final.mutable_metrics();
+  // Build output goes through a lock-free SPSC ring to a sender thread. Artifact
+  // and result events are emitted from this thread after pipe.flush(), which
+  // waits for the sender to go idle, so Write() calls never overlap.
+  LogPipe pipe([&](const std::string &stream, const std::string &text) {
+    pb::WorkerEvent log_event;
+    log_event.set_job_id(job.job_id());
+    log_event.set_lease(job.lease());
+    log_event.set_log("[" + stream + "] " + text);
+    emit(log_event);
+  });
   try {
     if (!safe_id(job.job_id()) || !safe_id(job.lease()))
       throw std::runtime_error("invalid job identifier");
@@ -106,9 +117,7 @@ void execute(const pb::Assignment &job, const fs::path &root,
     const auto deadline = started + std::chrono::seconds(job.timeout_seconds());
     std::string line_buffer;
     auto log = [&](const std::string &stream, const std::string &text) {
-      event.set_log("[" + stream + "] " + text);
-      emit(event);
-      event.clear_log();
+      pipe.push(stream, text);
       line_buffer += text;
       std::size_t pos = 0;
       while ((pos = line_buffer.find('\n')) != std::string::npos) {
@@ -174,6 +183,7 @@ void execute(const pb::Assignment &job, const fs::path &root,
          std::to_string(parallel)},
         workspace.path, "build");
     auto upload = [&](const fs::path &path, const std::string &name) {
+      pipe.flush(); // sender idle: artifact events may now be written from here
       auto size = fs::file_size(path);
       if (size > (256ULL << 20))
         throw std::runtime_error("artifact exceeds 256 MiB");
@@ -281,6 +291,11 @@ void execute(const pb::Assignment &job, const fs::path &root,
   }
   event.clear_log();
   event.clear_artifact();
+  try {
+    pipe.flush(); // every log line precedes the result
+  } catch (const std::exception &ex) {
+    final.set_error(ex.what()); // coordinator went away; the emit below reports it
+  }
   *event.mutable_result() = final;
   emit(event);
 }

@@ -1,0 +1,48 @@
+# Cross-compile the C++20 worker for aarch64 on an x86-64 host and run its
+# GoogleTest suite under qemu-user (qemu-aarch64).
+#
+#   docker build --platform linux/amd64 -f Dockerfile.worker-aarch64 --target test .
+#   docker build --platform linux/amd64 -f Dockerfile.worker-aarch64 --target binaries -o out/aarch64 .
+#
+# The build stage is pinned to linux/amd64 so it is a genuine cross build even
+# when Docker runs on an Arm machine (it then runs under emulation, slowly).
+ARG CROSS_HOST_PLATFORM=linux/amd64
+FROM --platform=$CROSS_HOST_PLATFORM ubuntu:24.04 AS cross
+ARG DEBIAN_FRONTEND=noninteractive
+# Keep the default sources amd64-only and add Ubuntu Ports for arm64 packages.
+RUN set -eux; \
+    sed -i '/^Types: deb$/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources; \
+    printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports\nSuites: noble noble-updates noble-security\nComponents: main universe\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+      > /etc/apt/sources.list.d/ubuntu-ports.sources; \
+    dpkg --add-architecture arm64; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      build-essential g++-aarch64-linux-gnu cmake ninja-build pkg-config git file binutils-aarch64-linux-gnu \
+      ca-certificates qemu-user protobuf-compiler protobuf-compiler-grpc nlohmann-json3-dev \
+      libc6:arm64 libstdc++6:arm64 libgrpc++-dev:arm64 libprotobuf-dev:arm64 \
+      libssl-dev:arm64 libgtest-dev:arm64; \
+    rm -rf /var/lib/apt/lists/*
+
+FROM cross AS build
+WORKDIR /src
+COPY proto ./proto
+COPY worker ./worker
+RUN cmake -S worker -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_TOOLCHAIN_FILE=/src/worker/cmake/aarch64-linux-gnu.cmake \
+      -DRG_HOST_PROTOC=/usr/bin/protoc -DRG_HOST_GRPC_PLUGIN=/usr/bin/grpc_cpp_plugin \
+ && cmake --build /build --parallel 4 \
+ && file /build/regressgrid-worker /build/worker-tests | tee /build/file.txt \
+ && grep -c "ARM aarch64" /build/file.txt
+
+# Runs every GoogleTest case with the target binaries executed by qemu-aarch64.
+# RG_EMULATED_SPAWN skips the one test (Process.MissingCommandThrows) whose
+# vfork-style ENOENT reporting does not survive user-mode emulation here.
+FROM build AS test
+ENV RG_EMULATED_SPAWN=1
+RUN qemu-aarch64 --version | head -1 \
+ && ctest --test-dir /build --output-on-failure
+
+FROM scratch AS binaries
+COPY --from=build /build/regressgrid-worker /regressgrid-worker
+COPY --from=build /build/worker-tests /worker-tests
+COPY --from=build /build/spsc-bench /spsc-bench
