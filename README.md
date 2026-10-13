@@ -201,6 +201,30 @@ end to end: the real log path is bounded by gRPC. The end-to-end e2e
 (`scripts/e2e.py`, needs Go, a server, and a Docker/Verilator setup) was not
 run for this change.
 
+## Benchmark driver for C++ workloads
+
+`worker/include/regressgrid/bench.hpp` is a small header-only toolkit for the
+C++ tests a submitted repository runs: `rg::bench::measure()` warms a callable
+up and times it with a steady clock (templated, `std::invocable`), a RAII
+`ScopedTimer` records one sample per scope, `summarize()` gives nearest-rank
+p50/p95/p99, mean and standard deviation, and `write_metrics()` writes the
+`regressgrid-metrics.json` file described above (`latency_ms` is the median,
+`throughput` is calls per second at that median, plus `p95_ms`, `p99_ms`,
+`stddev_ms` and `samples`). `worker/bench/kernel_bench.cpp` uses it to time
+`sort` and `inner_product` kernels over `int`, `double` and `float`:
+
+```sh
+cmake -S worker -B build/worker -DRG_BENCH=ON && cmake --build build/worker
+./build/worker/kernel-bench --iterations 50
+./build/worker/kernel-bench --workload dot_double --metrics regressgrid-metrics.json
+```
+
+`tests/bench_selftest.cpp` (CTest name `bench.selftest`) is a plain executable
+with no GoogleTest or gRPC dependency. It checks the percentile arithmetic
+against known values, input validation, that `measure()` calls the callable
+warm-up plus iterations times, and the metrics JSON fields. The numbers
+`kernel-bench` prints depend entirely on the machine, so none are recorded here.
+
 ## Configuration and API
 
 | Variable | Native default | Purpose |
