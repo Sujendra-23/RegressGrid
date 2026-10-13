@@ -1,4 +1,4 @@
-.PHONY: build test dev proto e2e up down worker-tsan worker-aarch64 worker-aarch64-binaries bench-spsc
+.PHONY: build test dev proto e2e up down worker-tsan worker-aarch64 worker-aarch64-binaries bench-spsc bench-vector benchmark-sanitizers
 build:
 	go build -o build/regressgrid ./cmd/server
 	go build -o build/rg ./cmd/rg
@@ -34,3 +34,11 @@ bench-spsc:
 	cmake -S worker -B build/bench -G Ninja -DCMAKE_BUILD_TYPE=Release
 	cmake --build build/bench --target spsc-bench
 	./build/bench/spsc-bench
+bench-vector:
+	cmake -S examples/benchmark -B build/benchmark -G Ninja -DCMAKE_BUILD_TYPE=Release
+	cmake --build build/benchmark --parallel 2
+	cd build/benchmark && ./regressgrid-bench
+benchmark-sanitizers:
+	cmake -S examples/benchmark -B build/benchmark-sanitizers -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRG_SANITIZERS=ON
+	cmake --build build/benchmark-sanitizers --parallel 2
+	UBSAN_OPTIONS=halt_on_error=1 ctest --test-dir build/benchmark-sanitizers --output-on-failure

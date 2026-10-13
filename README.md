@@ -201,6 +201,56 @@ end to end: the real log path is bounded by gRPC. The end-to-end e2e
 (`scripts/e2e.py`, needs Go, a server, and a Docker/Verilator setup) was not
 run for this change.
 
+## C++ / CUDA benchmark driver
+
+[`examples/benchmark`](examples/benchmark) is a standalone C++20 project with
+templated float/double vector addition, untimed warmups, per-iteration samples,
+output verification, and median/min/p95 latency. It requires only CMake, Ninja,
+and a C++ compiler for CPU builds; `make bench-vector` runs it in Release mode
+and `make benchmark-sanitizers` runs its host tests under ASan/UBSan.
+
+```sh
+cmake -S examples/benchmark -B build/benchmark -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/benchmark
+ctest --test-dir build/benchmark --output-on-failure
+./build/benchmark/regressgrid-bench --type double --elements 1048576 \
+  --warmup 5 --iterations 30 --output build/benchmark/regressgrid-metrics.json
+
+# Optional NVIDIA backend: requires a C++20-capable CUDA toolkit and a GPU.
+cmake -S examples/benchmark -B build/benchmark-cuda -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DRG_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=80
+cmake --build build/benchmark-cuda
+ctest --test-dir build/benchmark-cuda --output-on-failure
+compute-sanitizer --tool memcheck --error-exitcode 1 \
+  ./build/benchmark-cuda/regressgrid-bench --backend cuda --type double \
+  --elements 1025 --output build/benchmark-cuda/checked.json
+```
+
+Set `CMAKE_CUDA_ARCHITECTURES` to match your GPU. CUDA uses an explicit nonblocking
+stream and timing-enabled events recorded around each kernel launch, waiting for
+the stop event before reading elapsed time. Allocations, transfers, verification,
+and warmups are excluded. Move-only RAII owners release buffers, streams, and
+events on success and exceptions. CPU uses `steady_clock` and an optimizer
+barrier after each vector addition. GPU samples include effects of concurrent
+GPU activity and host launch gaps; these are measurements, not performance
+guarantees.
+
+The default output is `regressgrid-metrics.json` in the current directory:
+`latency_ms` is the median measured iteration and `throughput` is elements per
+second derived from that median. JSON also records the backend, scalar type,
+workload size, warmup/iteration counts, min/p95, and raw samples. Zero or
+nonfinite timings fail with a suggestion to increase workload size. Compare
+baselines using the same backend, type, size, compiler settings, and hardware.
+The host suite checks input/size errors, verification, statistics, sample order,
+move ownership, and cleanup after failures at every simulated CUDA operation;
+real CUDA CTests exercise float/double and a partial block. Host sanitizers and
+CUDA are separate builds; use NVIDIA Compute Sanitizer for device memory checks.
+CTest writes CPU float metrics to the build directory's `regressgrid-metrics.json`
+for worker ingestion; other smoke tests use separate files. GPU tests are labeled
+`gpu`, so `ctest --test-dir build/benchmark-cuda -LE gpu` runs only host tests.
+See [benchmark validation evidence](docs/validation.md#c-and-cuda-benchmark-driver)
+for tested toolchains and the pod's GCC 11 sanitizer workaround.
+
 ## Configuration and API
 
 | Variable | Native default | Purpose |
